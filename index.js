@@ -2,11 +2,6 @@ const express = require('express');
 const socket = require('socket.io');
 const app = express();
 const cors = require('cors');
-const fs = require('fs');
-
-var logger = fs.createWriteStream('log.txt', {
-    flags: 'a'
-  })
 
 app.use(cors());
 app.use(express.json());
@@ -35,9 +30,8 @@ const roundPoints = (value) => {
     }   
 }
 
-const server = app.listen(3001, () => {
-    console.log('server running on port 3001');
-    logger.write(buildLog("server running on port 3001"));
+const server = app.listen(process.env.PORT || 3000, () => {
+    console.log(buildLog(`server running on port ${process.env.PORT || 3000}`));
 });
 
 io = socket(server);
@@ -55,7 +49,7 @@ io.on("connection", (socket) => {
         });
 
         io.emit("players", players);
-        logger.write(buildLog(`User ${data} arrived at room`));
+        console.log(buildLog(`User ${data} arrived at room`));
         reveal = false;
         io.emit("reveal", reveal);
         io.emit('result', '');
@@ -106,7 +100,7 @@ io.on("connection", (socket) => {
     socket.on("disconnect", () => {
         playerDisconected = players.filter(p => p.id == socket.id);
         if (playerDisconected.length > 0)
-            logger.write(buildLog(`User ${playerDisconected[0].name} disconnected`));
+            console.log(buildLog(`User ${playerDisconected[0].name} disconnected`));
         players = players.filter(p => p.id != socket.id);
         io.emit("players", players);
         
