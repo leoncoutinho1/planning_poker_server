@@ -38,9 +38,9 @@ io = socket(server);
 
 let players = [];
 let games = [
-    { room: 'Eagles', title: 'Item 1', points: 0, active: true, order: 1 }, 
-    { room: 'Eagles', title: 'Item 2', points: 5, active: false, order: 2 }, 
-    { room: 'Eagles', title: 'Item 3', points: 3, active: false, order: 3 }
+    { room: 'Eagles', title: 'Item 1', points: 0, active: true, order: 0 }, 
+    { room: 'Eagles', title: 'Item 2', points: 5, active: false, order: 1 }, 
+    { room: 'Eagles', title: 'Item 3', points: 3, active: false, order: 2 }
 ];
 
 const reveal = (data) => {
@@ -75,7 +75,20 @@ io.on("connection", (socket) => {
         
         io.to(data.room).emit("players", players.filter(p => p.room == data.room));
         console.log(buildLog(`User ${data.user} arrived at room ${data.room}`));
-        io.to(data.room).emit('games', games);
+        io.to(data.room).emit('games', games.filter(g => g.room === data.room));
+    });
+
+    socket.on('addGame', (data) => {
+        let nextOrder = games.filter(g => g.room === data.room).length;
+        games.push({
+            room: data.room,
+            title: data.title, 
+            points: 0, 
+            active: false, 
+            order: nextOrder
+        });
+        io.to(data.room).emit('games', games.filter(g => g.room === data.room));
+        console.log(games);
     });
 
     socket.on("vote", (data) => {
@@ -99,20 +112,27 @@ io.on("connection", (socket) => {
     });
 
     socket.on('reset', (data) => {
-        let currentGame = games.find(g => g.room === data.room && g.active === true);
-        let nextGameIndex = games.findIndex(g => g.room === currentGame.room && g.order === currentGame.order + 1);
-        if (nextGameIndex !== -1) {
-            games[nextGameIndex].active = true;
-        
-            players.filter(p => p.room == data.room).map(p => p.vote = null);
+        if (games.findIndex(g => g.room === data.room) > -1) {
+            let currentGame = games.find(g => g.room === data.room && g.active === true);
+            let nextGameIndex = games.findIndex(g => g.room === currentGame.room && g.order === currentGame.order + 1);
+            if (nextGameIndex !== -1) {
+                games[nextGameIndex].active = true;
             
+                players.filter(p => p.room == data.room).map(p => p.vote = null);
+                
+                io.to(data.room).emit('players', players.filter(p => p.room == data.room));
+                io.to(data.room).emit('reveal', false);
+                io.to(data.room).emit('result', '');
+                
+                currentGame.active = false;
+                
+                io.to(data.room).emit('games', games.filter(g => g.room === data.room));
+            }
+        } else {
+            players.filter(p => p.room == data.room).map(p => p.vote = null);
             io.to(data.room).emit('players', players.filter(p => p.room == data.room));
             io.to(data.room).emit('reveal', false);
             io.to(data.room).emit('result', '');
-            
-            currentGame.active = false;
-            
-            io.to(data.room).emit('games', games.filter(g => g.room === data.room));
         }
     });
 
