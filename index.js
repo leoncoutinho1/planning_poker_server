@@ -37,22 +37,45 @@ const server = app.listen(process.env.PORT || 3001, () => {
 io = socket(server);
 
 let players = [];
+let games = [
+    { room: 'Eagles', title: 'Item 1', points: 0, active: true, order: 1 }, 
+    { room: 'Eagles', title: 'Item 2', points: 5, active: false, order: 2 }, 
+    { room: 'Eagles', title: 'Item 3', points: 3, active: false, order: 3 }
+];
+
+const reveal = (data) => {
+    let count = 0;
+    let sum = 0;
+    players.filter(p => p.room == data.room).forEach(p => {
+        if (p.vote != null) {
+            count++;
+            sum += p.vote;
+        }
+    });
+    var result = roundPoints(sum / count);
+    io.to(data.room).emit('result', result);
+    if (games.findIndex(g => g.room === data.room) > -1){
+        var currentGame = games.find(g => g.room === data.room && g.active === true);
+        currentGame.points = result;
+        io.to(data.room).emit('games', games.filter(g => g.room === data.room));
+    }    
+    io.to(data.room).emit('reveal', true);
+}
 
 io.on("connection", (socket) => {
     socket.on("join_room", (data) => {
         socket.join(data.room);
-        /*if (room.findIndex(r => r.id == data.room) === -1) {
-            console.log(`cria sala ${data.room}`);
-        }*/
+        
         players.push({
             name: data.user,
             id: socket.id,
             room: data.room,
             vote: null
         });
-
+        
         io.to(data.room).emit("players", players.filter(p => p.room == data.room));
         console.log(buildLog(`User ${data.user} arrived at room ${data.room}`));
+        io.to(data.room).emit('games', games);
     });
 
     socket.on("vote", (data) => {
@@ -66,34 +89,31 @@ io.on("connection", (socket) => {
             io.to(data.room).emit("players", players.filter(p => p.room == data.room));
                         
             if (!players.filter(p => p.room == data.room).some(p => p.vote == null)) {
-                io.to(data.room).emit('reveal', true);
-                let sum = 0;
-                players.filter(p => p.room == data.room).forEach(p => sum += p.vote);
-                io.to(data.room).emit('result', roundPoints(sum / players.filter(p => p.room == data.room).length));
+                reveal(data);
             }
         }
     });
 
     socket.on('reveal', (data) => {
-        let count = 0;
-        let sum = 0;
-        players.filter(p => p.room == data.room).forEach(p => {
-            if (p.vote != null) {
-                count++;
-                sum += p.vote;
-            }
-        });
-        reveal = true;
-        io.to(data.room).emit('result', roundPoints(sum / count));
-        io.to(data.room).emit('reveal', true);
+        reveal(data);
     });
 
     socket.on('reset', (data) => {
-        players.filter(p => p.room == data.room).map(p => p.vote = null);
+        let currentGame = games.find(g => g.room === data.room && g.active === true);
+        let nextGameIndex = games.findIndex(g => g.room === currentGame.room && g.order === currentGame.order + 1);
+        if (nextGameIndex !== -1) {
+            games[nextGameIndex].active = true;
         
-        io.to(data.room).emit('players', players.filter(p => p.room == data.room));
-        io.to(data.room).emit('reveal', false);
-        io.to(data.room).emit('result', '');
+            players.filter(p => p.room == data.room).map(p => p.vote = null);
+            
+            io.to(data.room).emit('players', players.filter(p => p.room == data.room));
+            io.to(data.room).emit('reveal', false);
+            io.to(data.room).emit('result', '');
+            
+            currentGame.active = false;
+            
+            io.to(data.room).emit('games', games.filter(g => g.room === data.room));
+        }
     });
 
     socket.on("disconnect", () => {
