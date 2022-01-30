@@ -37,11 +37,7 @@ const server = app.listen(process.env.PORT || 3001, () => {
 io = socket(server);
 
 let players = [];
-let games = [
-    { room: 'Eagles', title: 'Item 1', points: 0, active: true, order: 0 }, 
-    { room: 'Eagles', title: 'Item 2', points: 5, active: false, order: 1 }, 
-    { room: 'Eagles', title: 'Item 3', points: 3, active: false, order: 2 }
-];
+let games = [];
 
 const reveal = (data) => {
     let count = 0;
